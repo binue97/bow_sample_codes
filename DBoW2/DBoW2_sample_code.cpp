@@ -6,20 +6,26 @@
 
 #include <iostream>
 #include <vector>
-#include <iomanip>
+#include <filesystem>
+#include <string>
+#include <memory>
 
 using namespace DBoW2;
-using DescriptorVector = std::vector<std::vector<cv::Mat>>;
-using Descriptors = std::vector<cv::Mat>;
+namespace fs = std::filesystem;
+namespace UnitTest
+{
+  using FeatureVector = std::vector<std::vector<cv::Mat>>;
+  using Features = std::vector<cv::Mat>;
+  using FileLUT = std::vector<std::string>;
+}
 
-
-bool loadDBFeatures(DescriptorVector &vfeatures);
+bool loadDBFeatures(UnitTest::FeatureVector &vfeatures, UnitTest::FileLUT &dbTable);
 bool loadVocabulary(OrbVocabulary &voc);
-void changeStructure(const cv::Mat &plain, Descriptors &out);
-bool createDatabase(OrbDatabase &db, const DescriptorVector &vfeatures);
-bool loadQueryFeatures(DescriptorVector &vfeatures);
-bool queryDatabase(OrbDatabase &db, const DescriptorVector &vfeatures, std::vector<int> &imgIdx);
-bool saveResult(std::vector<int> &imgIdx);
+void changeStructure(const cv::Mat &plain, UnitTest::Features &out);
+bool createDatabase(OrbDatabase &db, const UnitTest::FeatureVector &vfeatures);
+bool loadQueryFeatures(UnitTest::FeatureVector &vfeatures);
+bool queryDatabase(OrbDatabase &db, const UnitTest::FeatureVector &vfeatures, UnitTest::FileLUT &queryResultTable, const UnitTest::FileLUT &dbTable);
+bool saveResult(const UnitTest::FileLUT &queryResultTable);
 
 
 // Number of Images to Build Database
@@ -29,9 +35,9 @@ constexpr int NQUERYIMAGES = 1;
 
 
 // Paths 
-const std::string vocPath = "../ORBvoc/ORBvoc.txt";
-const std::string dbPath = "../demo/Database/";
-const std::string queryPath = "../demo/Query/";
+fs::path vocPath("../ORBvoc/ORBvoc.txt");
+fs::path dbPath("../demo/Database/");
+fs::path queryPath("../demo/Query/");
 
 
 int main()
@@ -40,19 +46,20 @@ int main()
   EASY_PROFILER_ENABLE;
 
   // DataStructures
-  std::vector<int> imgIndex;
-  DescriptorVector dbFeatures;
-  DescriptorVector queryFeatures;
-  OrbVocabulary* ptrVocabulary = new OrbVocabulary();
+  UnitTest::FileLUT queryResultTable;
+  UnitTest::FileLUT dbTable;
+  UnitTest::FeatureVector dbFeatures;
+  UnitTest::FeatureVector queryFeatures;
+  std::unique_ptr<OrbVocabulary> ptrVocabulary(new OrbVocabulary());
 
-  if(!loadDBFeatures(dbFeatures))
+  if(!loadDBFeatures(dbFeatures, dbTable))
     std::cerr << "Error while loading DB features\n" << std::endl;
 
   if(!loadVocabulary(*ptrVocabulary))
     std::cerr << "Error while loading Vocabulary\n" << std::endl;
-  
+
   EASY_BLOCK("Initialize Database", profiler::colors::LightBlue);
-  OrbDatabase* ptrDatabase = new OrbDatabase(*ptrVocabulary, false, 0);
+  std::unique_ptr<OrbDatabase> ptrDatabase(new OrbDatabase(*ptrVocabulary, false, 0));
   EASY_END_BLOCK;
 
   if(!createDatabase(*ptrDatabase, dbFeatures))
@@ -61,10 +68,10 @@ int main()
   if(!loadQueryFeatures(queryFeatures))
     std::cerr << "Error loading Query features\n" << std::endl;
 
-  if(!queryDatabase(*ptrDatabase, queryFeatures, imgIndex))
+  if(!queryDatabase(*ptrDatabase, queryFeatures, queryResultTable, dbTable))
     std::cerr << "Error while Querying DB\n" << std::endl;
 
-  if(!saveResult(imgIndex))
+  if(!saveResult(queryResultTable))
     std::cerr << "Error while saving Results\n" << std::endl; 
 
   profiler::dumpBlocksToFile("DBoW2.prof");
@@ -72,22 +79,20 @@ int main()
 }
 
 
-bool loadDBFeatures(DescriptorVector &vfeatures)
+bool loadDBFeatures(UnitTest::FeatureVector &vfeatures, UnitTest::FileLUT &dbTable)
 {
-  EASY_FUNCTION("Load DB Descriptors", profiler::colors::LightGreen);
+  EASY_FUNCTION("Load DB Features", profiler::colors::LightGreen);
 
   vfeatures.clear();
   vfeatures.reserve(NDBIMAGES);
 
   cv::Ptr<cv::ORB> orb = cv::ORB::create();
 
-  // Feature Extraction for Database Images 
-  for(int i = 0; i < NDBIMAGES; ++i)
+  for(fs::directory_iterator it(dbPath); it != fs::end(it); it++)
   {
-    std::stringstream ss;
-    ss << dbPath << std::setfill('0') << std::setw(6) << i << ".png";
-
-    cv::Mat image = cv::imread(ss.str(), 0);
+    const fs::directory_entry &entry = *it;
+    std::string fileName = entry.path();
+    cv::Mat image = cv::imread(fileName, 0);
     if(image.empty()) return false;
     cv::Mat mask;
     std::vector<cv::KeyPoint> keypoints;
@@ -95,7 +100,8 @@ bool loadDBFeatures(DescriptorVector &vfeatures)
 
     orb->detectAndCompute(image, mask, keypoints, descriptors);
 
-    vfeatures.push_back(Descriptors());
+    dbTable.push_back(fileName);
+    vfeatures.push_back(UnitTest::Features());
     changeStructure(descriptors, vfeatures.back());
   }
 
@@ -104,7 +110,7 @@ bool loadDBFeatures(DescriptorVector &vfeatures)
 }
 
 
-void changeStructure(const cv::Mat &plain, Descriptors &out)
+void changeStructure(const cv::Mat &plain, UnitTest::Features &out)
 {
   out.resize(plain.rows);
 
@@ -128,7 +134,7 @@ bool loadVocabulary(OrbVocabulary &voc)
 }
 
 
-bool createDatabase(OrbDatabase &db, const DescriptorVector &vfeatures)
+bool createDatabase(OrbDatabase &db, const UnitTest::FeatureVector &vfeatures)
 {
   EASY_FUNCTION("Create Database", profiler::colors::Magenta);
 
@@ -141,9 +147,9 @@ bool createDatabase(OrbDatabase &db, const DescriptorVector &vfeatures)
 }
 
 
-bool loadQueryFeatures(DescriptorVector &vfeatures)
+bool loadQueryFeatures(UnitTest::FeatureVector &vfeatures)
 {
-  EASY_FUNCTION("Load Query Descriptors", profiler::colors::DeepOrange);
+  EASY_FUNCTION("Load Query Features", profiler::colors::DeepOrange);
 
   vfeatures.clear();
   vfeatures.reserve(NQUERYIMAGES);
@@ -151,13 +157,11 @@ bool loadQueryFeatures(DescriptorVector &vfeatures)
   cv::Ptr<cv::ORB> orb = cv::ORB::create();
 
   // Feature Extraction for Query Images 
-  for(int i = 0; i < NQUERYIMAGES; ++i)
+  for(fs::directory_iterator it(queryPath); it != fs::end(it); it++)
   {
-    std::stringstream ss;
-    
-    ss << queryPath << std::setfill('0') << std::setw(6) << i << ".png";
-
-    cv::Mat image = cv::imread(ss.str(), 0);
+    const fs::directory_entry &entry = *it;
+    std::string fileName = entry.path();
+    cv::Mat image = cv::imread(fileName, 0);
     if(image.empty()) return false;
     cv::Mat mask;
     std::vector<cv::KeyPoint> keypoints;
@@ -165,7 +169,7 @@ bool loadQueryFeatures(DescriptorVector &vfeatures)
 
     orb->detectAndCompute(image, mask, keypoints, descriptors);
 
-    vfeatures.push_back(Descriptors());
+    vfeatures.push_back(UnitTest::Features());
     changeStructure(descriptors, vfeatures.back());
   }
 
@@ -174,23 +178,23 @@ bool loadQueryFeatures(DescriptorVector &vfeatures)
 }
 
 
-bool queryDatabase(OrbDatabase &db, const DescriptorVector &vfeatures, std::vector<int> &imgIdx)
+bool queryDatabase(OrbDatabase &db, const UnitTest::FeatureVector &vfeatures, UnitTest::FileLUT &queryResultTable, const UnitTest::FileLUT &dbTable)
 {
   EASY_FUNCTION("Query Database", profiler::colors::DarkTeal);
 
   QueryResults ret;
-  int candidates = 4;
-  if(candidates > NQUERYIMAGES) return false;
+  int nCandidates = 1;
+  if(nCandidates > NQUERYIMAGES)  return false; 
 
   for(int i = 0; i < NQUERYIMAGES; i++)
   {
-    // Query & Save 4 best match in QueryResult
-    db.query(vfeatures[i], ret, candidates);
+    // Query & Save "nCandidates" best match in QueryResult
+    db.query(vfeatures[i], ret, nCandidates);
 
     std::cout << "Searching for Image " << i << ". " << ret << std::endl << std::endl;
 
     // Save Image index of the Best Match for each Query Image
-    imgIdx.push_back(ret[0].Id);
+    queryResultTable.push_back(dbTable[ret[0].Id]);
   }
 
   return true;
@@ -198,19 +202,17 @@ bool queryDatabase(OrbDatabase &db, const DescriptorVector &vfeatures, std::vect
 }
 
 
-bool saveResult(std::vector<int> &imgIdx)
+bool saveResult(const UnitTest::FileLUT &queryResultTable)
 {
   // Search Image by index and Save 
   for(int i = 0; i < NQUERYIMAGES; i++)
   {
-    std::stringstream ssR;
-    ssR << dbPath << std::setfill('0') << std::setw(6) << imgIdx[i] << ".png";
-    cv::Mat image = cv::imread(ssR.str(), 0);
+    cv::Mat image = cv::imread(queryResultTable[i], 0);
     if(image.empty()) return false;
 
-    std::stringstream ssW;
-    ssW << queryPath << "Result" << i << ".png";
-    cv::imwrite(ssW.str(), image);
+    std::string fileName = queryPath;
+    fileName = fileName + "Result" + std::to_string(i) + ".png";
+    cv::imwrite(fileName, image);
   }
 
   return true;
