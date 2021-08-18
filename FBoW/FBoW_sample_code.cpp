@@ -10,21 +10,27 @@
 
 #include <iomanip>
 #include <chrono>
+#include <filesystem>
+#include <string>
 
 using ORBVocabulary = DBoW2::TemplatedVocabulary<DBoW2::FORB::TDescriptor, DBoW2::FORB> ;
-using DescriptorVector = std::vector<std::vector<cv::Mat>>; 
+using FeatureVector = std::vector<std::vector<cv::Mat>>; 
+using FileLUT       = std::vector<std::string>;
+
+namespace fs = std::filesystem;
 
 vector<cv::Mat> loadFeatures(const std::string &imgPath, int imgNum, const std::string &descriptor);
 
 
 // Paths
-const std::string vocPath = "../../vocabularies/ORBvoc.fbow";
-const std::string databasePath = "../../Database/";
-const std::string queryPath = "../../Query/";
+fs::path vocPath = "../../vocabularies/ORBvoc.fbow";
+fs::path databasePath = "../../Database/";
+fs::path queryPath = "../../Query/";
 
 
 // Number of Database Images
 constexpr int NDBIMAGES = 4;
+// Number of Query Images
 constexpr int NQUERYIMAGES = 1;
 
 
@@ -33,35 +39,38 @@ int main(int argc,char**argv)
     EASY_MAIN_THREAD;
     EASY_PROFILER_ENABLE;
 
-    
+    FileLUT dbTable;
+
     EASY_BLOCK("Loading Vocabulary", profiler::colors::Lime);
     fbow::Vocabulary voc;
     voc.readFromFile(vocPath);
     EASY_END_BLOCK;
 
 
-    
     EASY_BLOCK("Extract DB Features", profiler::colors::LightBlue);
-    DescriptorVector dbFeatures(NDBIMAGES);
-    for (int i = 0; i < NDBIMAGES; ++i)
+    FeatureVector dbFeatures(NDBIMAGES);
+    int idx = 0;
+    for(fs::directory_iterator it(databasePath); it != fs::end(it); it++)
     {
-        std::stringstream ssDB;
-        ssDB << databasePath << setfill('0') << setw(6) << i << ".png";
-        dbFeatures[i] = loadFeatures(ssDB.str(), NDBIMAGES, "orb");
+        const fs::directory_entry &entry = *it;
+        std::string fileName = entry.path();
+        dbTable.push_back(fileName);
+        dbFeatures[idx++] = loadFeatures(fileName, NDBIMAGES, "orb");
     }
     EASY_END_BLOCK;
-    
+
 
     EASY_BLOCK("Extract QUERY Features", profiler::colors::LightGreen100);
-    DescriptorVector queryFeatures(NQUERYIMAGES);
-    for (int i = 0; i < NQUERYIMAGES; ++i)
+    FeatureVector queryFeatures(NQUERYIMAGES);
+    idx = 0;
+    for(fs::directory_iterator it(queryPath); it != fs::end(it); it++)
     {
-        std::stringstream ssQUERY;
-        ssQUERY << queryPath << setfill('0') << setw(6) << i << ".png";
-        queryFeatures[i] = loadFeatures(ssQUERY.str(), NQUERYIMAGES, "orb");
+        const fs::directory_entry &entry = *it;
+        std::string fileName = entry.path();
+        queryFeatures[idx++] = loadFeatures(fileName, NQUERYIMAGES, "orb");
     }
     EASY_END_BLOCK;
-        
+    
 
     // Query Image
     EASY_BLOCK("Calculate Similarity", profiler::colors::Magenta);
@@ -89,13 +98,11 @@ int main(int argc,char**argv)
     EASY_BLOCK("Save Result Image", profiler::colors::Olive);
     for(int i = 0; i < NQUERYIMAGES; i++)
     {
-        std::stringstream ssR;
-        ssR << databasePath << setfill('0') << setw(6) << scores.begin()->second << ".png";
-        cv::Mat image = cv::imread(ssR.str(), 0);
-
-        std::stringstream ssW;
-        ssW << queryPath << "Result" << i << ".png";
-        cv::imwrite(ssW.str(), image);
+        std::string loadPath = dbTable[scores.begin()->second];
+        cv::Mat image = cv::imread(loadPath, 0);
+        
+        std::string savePath = queryPath.string() + "Result" + std::to_string(i) + ".png";
+        cv::imwrite(savePath, image);
     }
     EASY_END_BLOCK;
 
