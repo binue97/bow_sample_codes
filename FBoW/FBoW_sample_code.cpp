@@ -26,6 +26,7 @@ vector<cv::Mat> loadFeatures(const std::string &imgPath, int imgNum, const std::
 fs::path vocPath = "../../vocabularies/ORBvoc.fbow";
 fs::path databasePath = "../../Database/";
 fs::path queryPath = "../../Query/";
+fs::path savePath = "../../Result/";
 
 
 // Number of Database Images
@@ -98,11 +99,11 @@ int main(int argc,char**argv)
     EASY_BLOCK("Save Result Image", profiler::colors::Olive);
     for(int i = 0; i < NQUERYIMAGES; i++)
     {
-        std::string loadPath = dbTable[scores.begin()->second];
-        cv::Mat image = cv::imread(loadPath, 0);
+        std::string readPath = dbTable[scores.begin()->second];
+        cv::Mat image = cv::imread(readPath, 0);
         
-        std::string savePath = queryPath.string() + "Result" + std::to_string(i) + ".png";
-        cv::imwrite(savePath, image);
+        std::string writePath = savePath.string() + "Result" + std::to_string(i) + ".png";
+        cv::imwrite(writePath, image);
     }
     EASY_END_BLOCK;
 
