@@ -19,11 +19,11 @@ namespace UnitTest
   using FileLUT = std::vector<std::string>;
 }
 
-bool loadDBFeatures(UnitTest::FeatureVector &vfeatures, UnitTest::FileLUT &dbTable);
+bool loadDBFeatures(UnitTest::FeatureVector &vfeatures, UnitTest::FileLUT &dbTable, const cv::Ptr<cv::ORB> &orb);
 bool loadVocabulary(OrbVocabulary &voc);
 void changeStructure(const cv::Mat &plain, UnitTest::Features &out);
 bool createDatabase(OrbDatabase &db, const UnitTest::FeatureVector &vfeatures);
-bool loadQueryFeatures(UnitTest::FeatureVector &vfeatures);
+bool loadQueryFeatures(UnitTest::FeatureVector &vfeatures, const cv::Ptr<cv::ORB> &orb);
 bool queryDatabase(OrbDatabase &db, const UnitTest::FeatureVector &vfeatures, UnitTest::FileLUT &queryResultTable, const UnitTest::FileLUT &dbTable);
 bool saveResult(const UnitTest::FileLUT &queryResultTable);
 
@@ -38,6 +38,7 @@ constexpr int NQUERYIMAGES = 1;
 fs::path vocPath("../ORBvoc/ORBvoc.txt");
 fs::path dbPath("../demo/Database/");
 fs::path queryPath("../demo/Query/");
+fs::path savePath("../demo/Result/");
 
 
 int main()
@@ -50,9 +51,10 @@ int main()
   UnitTest::FileLUT dbTable;
   UnitTest::FeatureVector dbFeatures;
   UnitTest::FeatureVector queryFeatures;
+  cv::Ptr<cv::ORB> ORB = cv::ORB::create();
   std::unique_ptr<OrbVocabulary> ptrVocabulary(new OrbVocabulary());
 
-  if(!loadDBFeatures(dbFeatures, dbTable))
+  if(!loadDBFeatures(dbFeatures, dbTable, ORB))
     std::cerr << "Error while loading DB features\n" << std::endl;
 
   if(!loadVocabulary(*ptrVocabulary))
@@ -65,7 +67,7 @@ int main()
   if(!createDatabase(*ptrDatabase, dbFeatures))
     std::cerr << "Error while Creating DB\n" << std::endl;
 
-  if(!loadQueryFeatures(queryFeatures))
+  if(!loadQueryFeatures(queryFeatures, ORB))
     std::cerr << "Error loading Query features\n" << std::endl;
 
   if(!queryDatabase(*ptrDatabase, queryFeatures, queryResultTable, dbTable))
@@ -79,14 +81,12 @@ int main()
 }
 
 
-bool loadDBFeatures(UnitTest::FeatureVector &vfeatures, UnitTest::FileLUT &dbTable)
+bool loadDBFeatures(UnitTest::FeatureVector &vfeatures, UnitTest::FileLUT &dbTable, const cv::Ptr<cv::ORB> &orb)
 {
   EASY_FUNCTION("Load DB Features", profiler::colors::LightGreen);
 
   vfeatures.clear();
   vfeatures.reserve(NDBIMAGES);
-
-  cv::Ptr<cv::ORB> orb = cv::ORB::create();
 
   for(fs::directory_iterator it(dbPath); it != fs::end(it); it++)
   {
@@ -147,14 +147,12 @@ bool createDatabase(OrbDatabase &db, const UnitTest::FeatureVector &vfeatures)
 }
 
 
-bool loadQueryFeatures(UnitTest::FeatureVector &vfeatures)
+bool loadQueryFeatures(UnitTest::FeatureVector &vfeatures, const cv::Ptr<cv::ORB> &orb)
 {
   EASY_FUNCTION("Load Query Features", profiler::colors::DeepOrange);
 
   vfeatures.clear();
   vfeatures.reserve(NQUERYIMAGES);
-
-  cv::Ptr<cv::ORB> orb = cv::ORB::create();
 
   // Feature Extraction for Query Images 
   for(fs::directory_iterator it(queryPath); it != fs::end(it); it++)
@@ -210,7 +208,7 @@ bool saveResult(const UnitTest::FileLUT &queryResultTable)
     cv::Mat image = cv::imread(queryResultTable[i], 0);
     if(image.empty()) return false;
 
-    std::string fileName = queryPath;
+    std::string fileName = savePath;
     fileName = fileName + "Result" + std::to_string(i) + ".png";
     cv::imwrite(fileName, image);
   }
