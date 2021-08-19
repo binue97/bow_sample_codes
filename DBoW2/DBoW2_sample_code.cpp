@@ -12,20 +12,20 @@
 
 using namespace DBoW2;
 namespace fs = std::filesystem;
-namespace UnitTest
+namespace SampleCode
 {
   using FeatureVector = std::vector<std::vector<cv::Mat>>;
   using Features = std::vector<cv::Mat>;
   using FileLUT = std::vector<std::string>;
 }
 
-bool loadDBFeatures(UnitTest::FeatureVector &vfeatures, UnitTest::FileLUT &dbTable, const cv::Ptr<cv::ORB> &orb);
-bool loadVocabulary(OrbVocabulary &voc);
-void changeStructure(const cv::Mat &plain, UnitTest::Features &out);
-bool createDatabase(OrbDatabase &db, const UnitTest::FeatureVector &vfeatures);
-bool loadQueryFeatures(UnitTest::FeatureVector &vfeatures, const cv::Ptr<cv::ORB> &orb);
-bool queryDatabase(OrbDatabase &db, const UnitTest::FeatureVector &vfeatures, UnitTest::FileLUT &queryResultTable, const UnitTest::FileLUT &dbTable);
-bool saveResult(const UnitTest::FileLUT &queryResultTable);
+bool loadDBFeatures(SampleCode::FeatureVector& vfeatures, SampleCode::FileLUT& dbTable, const cv::Ptr<cv::ORB>& orb);
+bool loadVocabulary(OrbVocabulary& voc);
+void changeStructure(const cv::Mat& plain, SampleCode::Features& out);
+bool createDatabase(OrbDatabase& db, const SampleCode::FeatureVector& vfeatures);
+bool loadQueryFeatures(SampleCode::FeatureVector& vfeatures, const cv::Ptr<cv::ORB>& orb);
+bool queryDatabase(OrbDatabase& db, const SampleCode::FeatureVector& vfeatures, SampleCode::FileLUT& queryResultTable, const SampleCode::FileLUT& dbTable);
+bool saveResult(const SampleCode::FileLUT& queryResultTable);
 
 
 // Number of Images to Build Database
@@ -47,10 +47,10 @@ int main()
   EASY_PROFILER_ENABLE;
 
   // DataStructures
-  UnitTest::FileLUT queryResultTable;
-  UnitTest::FileLUT dbTable;
-  UnitTest::FeatureVector dbFeatures;
-  UnitTest::FeatureVector queryFeatures;
+  SampleCode::FileLUT queryResultTable;
+  SampleCode::FileLUT dbTable;
+  SampleCode::FeatureVector dbFeatures;
+  SampleCode::FeatureVector queryFeatures;
   cv::Ptr<cv::ORB> ORB = cv::ORB::create();
   std::unique_ptr<OrbVocabulary> ptrVocabulary(new OrbVocabulary());
 
@@ -81,7 +81,7 @@ int main()
 }
 
 
-bool loadDBFeatures(UnitTest::FeatureVector &vfeatures, UnitTest::FileLUT &dbTable, const cv::Ptr<cv::ORB> &orb)
+bool loadDBFeatures(SampleCode::FeatureVector& vfeatures, SampleCode::FileLUT& dbTable, const cv::Ptr<cv::ORB>& orb)
 {
   EASY_FUNCTION("Load DB Features", profiler::colors::LightGreen);
 
@@ -90,10 +90,12 @@ bool loadDBFeatures(UnitTest::FeatureVector &vfeatures, UnitTest::FileLUT &dbTab
 
   for(fs::directory_iterator it(dbPath); it != fs::end(it); it++)
   {
-    const fs::directory_entry &entry = *it;
-    std::string fileName = entry.path();
+    const fs::directory_entry& entry = *it;
+    const std::string fileName = entry.path();
     cv::Mat image = cv::imread(fileName, 0);
-    if(image.empty()) return false;
+    if(image.empty()) 
+      return false;
+
     cv::Mat mask;
     std::vector<cv::KeyPoint> keypoints;
     cv::Mat descriptors;
@@ -101,7 +103,7 @@ bool loadDBFeatures(UnitTest::FeatureVector &vfeatures, UnitTest::FileLUT &dbTab
     orb->detectAndCompute(image, mask, keypoints, descriptors);
 
     dbTable.push_back(fileName);
-    vfeatures.push_back(UnitTest::Features());
+    vfeatures.emplace_back(SampleCode::Features());
     changeStructure(descriptors, vfeatures.back());
   }
 
@@ -110,7 +112,7 @@ bool loadDBFeatures(UnitTest::FeatureVector &vfeatures, UnitTest::FileLUT &dbTab
 }
 
 
-void changeStructure(const cv::Mat &plain, UnitTest::Features &out)
+void changeStructure(const cv::Mat& plain, SampleCode::Features& out)
 {
   out.resize(plain.rows);
 
@@ -120,11 +122,12 @@ void changeStructure(const cv::Mat &plain, UnitTest::Features &out)
 }
 
 
-bool loadVocabulary(OrbVocabulary &voc)
+bool loadVocabulary(OrbVocabulary& voc)
 {
   EASY_FUNCTION("Load Vocabulary", profiler::colors::Yellow);
   
-  if(!voc.loadFromTextFile(vocPath))  return false;
+  if(!voc.loadFromTextFile(vocPath))  
+    return false;
 
   std::cout << "< Vocabulary information >" << std::endl
   << voc << std::endl << std::endl;
@@ -134,7 +137,7 @@ bool loadVocabulary(OrbVocabulary &voc)
 }
 
 
-bool createDatabase(OrbDatabase &db, const UnitTest::FeatureVector &vfeatures)
+bool createDatabase(OrbDatabase& db, const SampleCode::FeatureVector& vfeatures)
 {
   EASY_FUNCTION("Create Database", profiler::colors::Magenta);
 
@@ -147,7 +150,7 @@ bool createDatabase(OrbDatabase &db, const UnitTest::FeatureVector &vfeatures)
 }
 
 
-bool loadQueryFeatures(UnitTest::FeatureVector &vfeatures, const cv::Ptr<cv::ORB> &orb)
+bool loadQueryFeatures(SampleCode::FeatureVector& vfeatures, const cv::Ptr<cv::ORB>& orb)
 {
   EASY_FUNCTION("Load Query Features", profiler::colors::DeepOrange);
 
@@ -157,17 +160,19 @@ bool loadQueryFeatures(UnitTest::FeatureVector &vfeatures, const cv::Ptr<cv::ORB
   // Feature Extraction for Query Images 
   for(fs::directory_iterator it(queryPath); it != fs::end(it); it++)
   {
-    const fs::directory_entry &entry = *it;
-    std::string fileName = entry.path();
+    const fs::directory_entry& entry = *it;
+    const std::string fileName = entry.path();
     cv::Mat image = cv::imread(fileName, 0);
-    if(image.empty()) return false;
+    if(image.empty()) 
+      return false;
+
     cv::Mat mask;
     std::vector<cv::KeyPoint> keypoints;
     cv::Mat descriptors;
 
     orb->detectAndCompute(image, mask, keypoints, descriptors);
 
-    vfeatures.push_back(UnitTest::Features());
+    vfeatures.emplace_back(SampleCode::Features());
     changeStructure(descriptors, vfeatures.back());
   }
 
@@ -176,13 +181,14 @@ bool loadQueryFeatures(UnitTest::FeatureVector &vfeatures, const cv::Ptr<cv::ORB
 }
 
 
-bool queryDatabase(OrbDatabase &db, const UnitTest::FeatureVector &vfeatures, UnitTest::FileLUT &queryResultTable, const UnitTest::FileLUT &dbTable)
+bool queryDatabase(OrbDatabase& db, const SampleCode::FeatureVector& vfeatures, SampleCode::FileLUT& queryResultTable, const SampleCode::FileLUT& dbTable)
 {
   EASY_FUNCTION("Query Database", profiler::colors::DarkTeal);
 
   QueryResults ret;
   int nCandidates = 1;
-  if(nCandidates > NQUERYIMAGES)  return false; 
+  if(nCandidates > NQUERYIMAGES)  
+    return false; 
 
   for(int i = 0; i < NQUERYIMAGES; i++)
   {
@@ -192,7 +198,8 @@ bool queryDatabase(OrbDatabase &db, const UnitTest::FeatureVector &vfeatures, Un
     std::cout << "Searching for Image " << i << ". " << ret << std::endl << std::endl;
 
     // Save Image index of the Best Match for each Query Image
-    queryResultTable.push_back(dbTable[ret[0].Id]);
+    const auto& bestMatch = dbTable[ret[0].Id];
+    queryResultTable.push_back(bestMatch);
   }
 
   return true;
@@ -200,13 +207,14 @@ bool queryDatabase(OrbDatabase &db, const UnitTest::FeatureVector &vfeatures, Un
 }
 
 
-bool saveResult(const UnitTest::FileLUT &queryResultTable)
+bool saveResult(const SampleCode::FileLUT& queryResultTable)
 {
   // Search Image by index and Save 
   for(int i = 0; i < NQUERYIMAGES; i++)
   {
     cv::Mat image = cv::imread(queryResultTable[i], 0);
-    if(image.empty()) return false;
+    if(image.empty()) 
+      return false;
 
     std::string fileName = savePath;
     fileName = fileName + "Result" + std::to_string(i) + ".png";
