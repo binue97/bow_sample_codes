@@ -19,7 +19,7 @@ using FileLUT       = std::vector<std::string>;
 
 namespace fs = std::filesystem;
 
-vector<cv::Mat> loadFeatures(const std::string &imgPath, int imgNum, const std::string &descriptor);
+vector<cv::Mat> loadFeatures(const std::string& imgPath, int imgNum, const std::string& descriptor);
 
 
 // Paths
@@ -35,7 +35,7 @@ constexpr int NDBIMAGES = 4;
 constexpr int NQUERYIMAGES = 1;
 
 
-int main(int argc,char**argv)
+int main(int argc, char**argv)
 {
     EASY_MAIN_THREAD;
     EASY_PROFILER_ENABLE;
@@ -53,8 +53,8 @@ int main(int argc,char**argv)
     int idx = 0;
     for(fs::directory_iterator it(databasePath); it != fs::end(it); it++)
     {
-        const fs::directory_entry &entry = *it;
-        std::string fileName = entry.path();
+        const fs::directory_entry& entry = *it;
+        const std::string fileName = entry.path();
         dbTable.push_back(fileName);
         dbFeatures[idx++] = loadFeatures(fileName, NDBIMAGES, "orb");
     }
@@ -66,8 +66,8 @@ int main(int argc,char**argv)
     idx = 0;
     for(fs::directory_iterator it(queryPath); it != fs::end(it); it++)
     {
-        const fs::directory_entry &entry = *it;
-        std::string fileName = entry.path();
+        const fs::directory_entry& entry = *it;
+        const std::string fileName = entry.path();
         queryFeatures[idx++] = loadFeatures(fileName, NQUERYIMAGES, "orb");
     }
     EASY_END_BLOCK;
@@ -81,7 +81,7 @@ int main(int argc,char**argv)
     {
         queryBoW = voc.transform(queryFeatures[i][0]);
 
-        for (size_t j = 0; j < dbFeatures.size(); j++)
+        for (uint64_t j = 0; j < dbFeatures.size(); j++)
         {
             dbBoW = voc.transform(dbFeatures[j][0]);
             double score = queryBoW.score(queryBoW, dbBoW);
@@ -99,10 +99,10 @@ int main(int argc,char**argv)
     EASY_BLOCK("Save Result Image", profiler::colors::Olive);
     for(int i = 0; i < NQUERYIMAGES; i++)
     {
-        std::string readPath = dbTable[scores.begin()->second];
+        const std::string readPath = dbTable[scores.begin()->second];
         cv::Mat image = cv::imread(readPath, 0);
         
-        std::string writePath = savePath.string() + "Result" + std::to_string(i) + ".png";
+        const std::string writePath = savePath.string() + "Result" + std::to_string(i) + ".png";
         cv::imwrite(writePath, image);
     }
     EASY_END_BLOCK;
@@ -113,18 +113,18 @@ int main(int argc,char**argv)
 }
 
 
-vector<cv::Mat> loadFeatures(const std::string &imgPath, int imgNum, const std::string &descriptor = "")  
+vector<cv::Mat> loadFeatures(const std::string& imgPath, int imgNum, const std::string& descriptor = "")  
 {
     //select detector
     cv::Ptr<cv::Feature2D> fdetector;
+    assert(descriptor == "orb" || descriptor == "brisk");
     if (descriptor == "orb")        fdetector = cv::ORB::create(2000);
 
     else if (descriptor == "brisk") fdetector = cv::BRISK::create();
 
     else throw std::runtime_error("Invalid descriptor");
-    assert(!descriptor.empty());
+
     std::vector<cv::Mat> features;
-    
     std::vector<cv::KeyPoint> keypoints;
     cv::Mat descriptors;
     cv::Mat image = cv::imread(imgPath, 0);
