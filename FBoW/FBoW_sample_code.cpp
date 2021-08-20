@@ -23,10 +23,11 @@ vector<cv::Mat> loadFeatures(const std::string& imgPath, int imgNum, const std::
 
 
 // Paths
-fs::path vocPath = "../../vocabularies/ORBvoc.fbow";
-fs::path databasePath = "../../Database/";
-fs::path queryPath = "../../Query/";
-fs::path savePath = "../../Result/";
+fs::path curPath = fs::current_path();
+fs::path vocPath = curPath.parent_path().parent_path() / "vocabularies" / "ORBvoc.fbow";
+fs::path databasePath = curPath.parent_path().parent_path() / "Database";
+fs::path queryPath = curPath.parent_path().parent_path() / "Query";
+fs::path savePath = curPath.parent_path().parent_path() / "Result" / "";
 
 
 // Number of Database Images
@@ -51,9 +52,8 @@ int main(int argc, char**argv)
     EASY_BLOCK("Extract DB Features", profiler::colors::LightBlue);
     FeatureVector dbFeatures(NDBIMAGES);
     int idx = 0;
-    for(fs::directory_iterator it(databasePath); it != fs::end(it); it++)
+    for(const auto& entry : fs::directory_iterator(databasePath))
     {
-        const fs::directory_entry& entry = *it;
         const std::string fileName = entry.path();
         dbTable.push_back(fileName);
         dbFeatures[idx++] = loadFeatures(fileName, NDBIMAGES, "orb");
@@ -64,9 +64,8 @@ int main(int argc, char**argv)
     EASY_BLOCK("Extract QUERY Features", profiler::colors::LightGreen100);
     FeatureVector queryFeatures(NQUERYIMAGES);
     idx = 0;
-    for(fs::directory_iterator it(queryPath); it != fs::end(it); it++)
+    for(const auto& entry : fs::directory_iterator(queryPath))
     {
-        const fs::directory_entry& entry = *it;
         const std::string fileName = entry.path();
         queryFeatures[idx++] = loadFeatures(fileName, NQUERYIMAGES, "orb");
     }
