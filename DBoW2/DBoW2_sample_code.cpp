@@ -35,10 +35,12 @@ constexpr int NQUERYIMAGES = 1;
 
 
 // Paths 
-fs::path vocPath("../ORBvoc/ORBvoc.txt");
-fs::path dbPath("../demo/Database/");
-fs::path queryPath("../demo/Query/");
-fs::path savePath("../demo/Result/");
+fs::path curPath = fs::current_path();
+fs::path vocPath = curPath.parent_path() / "ORBvoc" / "ORBvoc.txt";
+fs::path dbPath = curPath.parent_path() / "demo" / "Database";
+fs::path queryPath = curPath.parent_path() / "demo" / "Query";
+fs::path savePath = curPath.parent_path() / "demo" / "Result" / "";
+
 
 
 int main()
@@ -52,7 +54,7 @@ int main()
   SampleCode::FeatureVector dbFeatures;
   SampleCode::FeatureVector queryFeatures;
   cv::Ptr<cv::ORB> ORB = cv::ORB::create();
-  std::unique_ptr<OrbVocabulary> ptrVocabulary(new OrbVocabulary());
+  auto ptrVocabulary = std::make_unique<OrbVocabulary>();
 
   if(!loadDBFeatures(dbFeatures, dbTable, ORB))
     std::cerr << "Error while loading DB features\n" << std::endl;
@@ -61,7 +63,7 @@ int main()
     std::cerr << "Error while loading Vocabulary\n" << std::endl;
 
   EASY_BLOCK("Initialize Database", profiler::colors::LightBlue);
-  std::unique_ptr<OrbDatabase> ptrDatabase(new OrbDatabase(*ptrVocabulary, false, 0));
+  auto ptrDatabase = std::make_unique<OrbDatabase>(*ptrVocabulary);
   EASY_END_BLOCK;
 
   if(!createDatabase(*ptrDatabase, dbFeatures))
@@ -88,9 +90,8 @@ bool loadDBFeatures(SampleCode::FeatureVector& vfeatures, SampleCode::FileLUT& d
   vfeatures.clear();
   vfeatures.reserve(NDBIMAGES);
 
-  for(fs::directory_iterator it(dbPath); it != fs::end(it); it++)
+  for(const auto& entry : fs::directory_iterator(dbPath))
   {
-    const fs::directory_entry& entry = *it;
     const std::string fileName = entry.path();
     cv::Mat image = cv::imread(fileName, 0);
     if(image.empty()) 
@@ -125,7 +126,6 @@ void changeStructure(const cv::Mat& plain, SampleCode::Features& out)
 bool loadVocabulary(OrbVocabulary& voc)
 {
   EASY_FUNCTION("Load Vocabulary", profiler::colors::Yellow);
-  
   if(!voc.loadFromTextFile(vocPath))  
     return false;
 
@@ -158,9 +158,8 @@ bool loadQueryFeatures(SampleCode::FeatureVector& vfeatures, const cv::Ptr<cv::O
   vfeatures.reserve(NQUERYIMAGES);
 
   // Feature Extraction for Query Images 
-  for(fs::directory_iterator it(queryPath); it != fs::end(it); it++)
+  for(const auto& entry : fs::directory_iterator(queryPath))
   {
-    const fs::directory_entry& entry = *it;
     const std::string fileName = entry.path();
     cv::Mat image = cv::imread(fileName, 0);
     if(image.empty()) 
