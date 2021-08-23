@@ -99,7 +99,7 @@ int main(int argc, char**argv)
     for(int i = 0; i < NQUERYIMAGES; i++)
     {
         const std::string readPath = dbTable[scores.begin()->second];
-        cv::Mat image = cv::imread(readPath, 0);
+        const cv::Mat image = cv::imread(readPath, 0);
         
         const std::string writePath = savePath.string() + "Result" + std::to_string(i) + ".png";
         cv::imwrite(writePath, image);
@@ -126,7 +126,7 @@ vector<cv::Mat> loadFeatures(const std::string& imgPath, int imgNum, const std::
     std::vector<cv::Mat> features;
     std::vector<cv::KeyPoint> keypoints;
     cv::Mat descriptors;
-    cv::Mat image = cv::imread(imgPath, 0);
+    const cv::Mat image = cv::imread(imgPath, 0);
     
     if (image.empty())
         throw std::runtime_error("Could not open image" + imgPath);
